@@ -10,31 +10,72 @@ const io = new Server(server);
 // serve client
 app.use(express.static(path.join(__dirname, "../client")));
 
+// keep track of online users: socket.id -> username
+const users = new Map();
+
+function broadcastUserList() {
+  const userList = Array.from(users.entries()).map(([id, username]) => ({
+    id,
+    username,
+  }));
+  io.emit("userList", userList);
+}
+
 io.on("connection", (socket) => {
   console.log("🔥 User connected:", socket.id);
 
   // store username after user sends it
   socket.on("setUsername", (username) => {
     socket.username = username;
+    users.set(socket.id, username);
     console.log(`🟢 ${username} joined`);
-    // io.emit("notification", `${username} joined the chat`); // Everyone (including sender)
-    socket.broadcast.emit("notification", `${username} joined the chat`); //Everyone except sender
+
+    // notify others (not this user)
+    socket.broadcast.emit("notification", `${username} joined the chat`);
+
+    // send updated online users list to everyone
+    broadcastUserList();
   });
 
   // chat message
   socket.on("chatMessage", (text) => {
+    if (!socket.username) return; // safety
+
     io.emit("chatMessage", {
       text,
       username: socket.username,
-      time: new Date().toISOString()
+      time: new Date().toISOString(),
+    });
+  });
+
+  // 📝 typing indicator
+  socket.on("typing", () => {
+    if (!socket.username) return;
+    // tell everyone except the typer
+    socket.broadcast.emit("typing", {
+      username: socket.username,
+    });
+  });
+
+  socket.on("stopTyping", () => {
+    if (!socket.username) return;
+    socket.broadcast.emit("stopTyping", {
+      username: socket.username,
     });
   });
 
   socket.on("disconnect", () => {
     if (socket.username) {
-      io.emit("notification", `${socket.username} left the chat`);
+      console.log(`🔴 ${socket.username} left`);
+      users.delete(socket.id);
+
+      // notify others
+      socket.broadcast.emit("notification", `${socket.username} left the chat`);
+      // update user list
+      broadcastUserList();
     }
   });
 });
 
-server.listen(3000, () => console.log("🚀 Server running on port 3000"));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

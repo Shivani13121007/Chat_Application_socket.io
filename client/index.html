@@ -12,6 +12,7 @@
       <h1>💬 WebSocket Chat</h1>
       <div class="user-info">
         <span id="usernameDisplay"></span>
+        <span id="onlineInfo"></span>
       </div>
     </header>
 
@@ -19,11 +20,13 @@
       <ul id="messages"></ul>
     </main>
 
+    <div id="typingIndicator" class="typing-indicator"></div>
+
     <form id="messageForm" autocomplete="off">
       <input
         id="messageInput"
         type="text"
-        placeholder="Type a message..."
+       placeholder="Type a message..."
         required
       />
       <button type="submit">Send</button>
